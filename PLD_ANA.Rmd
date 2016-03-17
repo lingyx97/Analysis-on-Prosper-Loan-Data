@@ -1,0 +1,23 @@
+---
+title: "Prosper Loan Data Analysis by Yuxun Ling"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+library(ggplot2)
+```
+
+```{r echo=FALSE, Load_The_Data}
+#Load the data
+data_o <- read.csv('prosperLoanData.csv', sep = ',')
+```
+
+```{r echo=FALSE}
+str(data_o)
+```
+
+

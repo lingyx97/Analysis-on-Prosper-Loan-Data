@@ -1,0 +1,2 @@
+http://stackoverflow.com/questions/17964513/subset-variables-in-data-frame-based-on-column-type
+https://docs.google.com/spreadsheets/d/1gDyi_L4UvIrLTEC6Wri5nbaMmkGmLQBk-Yx3z0XDEtI/edit#gid=0
