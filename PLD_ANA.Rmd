@@ -9,6 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
 library(ggplot2)
+library(dplyr)
 ```
 
 ```{r echo=FALSE, Load_The_Data}
@@ -19,5 +20,164 @@ data_o <- read.csv('prosperLoanData.csv', sep = ',')
 ```{r echo=FALSE}
 str(data_o)
 ```
+
+```{r echo=FALSE}
+# find all categorical variables
+data_sub_cat <- data_o[sapply(data_o,is.factor)]
+names(data_sub_cat)
+```
+ 
+
+
+```{r}
+#identify levels of factors
+levels(data_o$CreditGrade)
+levels(data_o$LoanStatus)
+levels(data_o$ProsperRating..Alpha.)
+levels(data_o$BorrowerState)
+levels(data_o$Occupation)
+levels(data_o$EmploymentStatus)
+levels(data_o$IncomeRange)
+```
+
+```{r echo=FALSE}
+#summarise the data
+summary(data_o)
+```
+The summary indicates that ListingKey, ListingCreationDate, LoanKey, and DateCreditPulled are related
+  
+ProsperRating and ProsperScore related to EstimatedEffectiveYield, EstimatedLoss, and EstimatedRetuen. (because they have same amount of NA's)
+  
+Over 2/3 of the total observations do not have CreditGrade
+  
+Some variables related to delinquencies have skewed obervations.
+  
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+#Some Univariate Graphs
+qplot(data = subset(data_o,CreditGrade!=''),x=CreditGrade)
+qplot(data=data_o,x=Term)
+```
+Only Three Possible Terms are allowed. (One year, Three years, and five years)
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+qplot(data=data_o,x=BorrowerAPR)
+qplot(data=data_o,x=BorrowerRate)
+qplot(data=data_o,x=LenderYield)
+qplot(data=data_o,x=EstimatedEffectiveYield)
+qplot(data=data_o,x=EstimatedLoss)
+```
+The above five graphs are quite similar because BorrowerAPR, EstimatedEffectiveYield and LenderYield are BorrowerRate minusing some comparatively small percentages or constants (e.g. servicing fee), and EstimatedLoss should be a percentage of BorrowerRate plusing some constant.
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+cor.test(data_o$BorrowerAPR,data_o$BorrowerRate,method = 'pearson')
+cor.test(data_o$LenderYield,data_o$BorrowerRate,method = 'pearson')
+cor.test(data_o$EstimatedEffectiveYield,data_o$BorrowerRate, method = 'pearson')
+cor.test(data_o$EstimatedLoss,data_o$BorrowerRate,method = 'pearson')
+```
+The pearson correlation test also suggests strong correlation between BorrowerRate and other four variables.
+  
+The correlation between EstimateedEffectiveYield and BorrowerRate is 0.5% less than 0.9 may due to the involving of late fee and charge-off loss.
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+qplot(data = data_o,x=EstimatedReturn)
+qqnorm(with(subset(data_o,!is.na(EstimatedReturn)),EstimatedReturn-mean(EstimatedReturn)))
+```
+EstimatedReturn is not symmetrically distributed around mean.
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+qplot(data=data_o,x=EstimatedReturn,bins=500)
+data_o.sum_by_EstRet <- subset(data_o,!is.na(EstimatedReturn)) %>%
+  group_by(EstimatedReturn) %>%
+  summarise(n=n()) %>%
+  arrange(desc(n))
+head(data_o.sum_by_EstRet)
+```
+A closer look indicates that some specific values (e.g. 0.1246) have extremely high count.
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+data_o.sum_by_BorRat <- subset(data_o,!is.na(BorrowerRate)) %>%
+  group_by(BorrowerRate) %>%
+  summarise(n=n()) %>%
+  arrange(desc(n))
+head(data_o.sum_by_BorRat)
+```
+Counting the frequency of each value of BorrowerRate. One possibile cause of high-count EstimateReturn may be a high count of BorrowerRate at 0.3177.
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+qplot(data=data_o,x=ProsperRating..numeric.)
+qplot(data=data_o,x=ProsperScore)
+qplot(data=data_o,x=EmploymentStatusDuration)
+```
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+ggplot(data = data_o,aes(x=EmploymentStatusDuration))+
+  geom_histogram(binwidth = 3)+
+  xlim(c(0,600))
+```
+Notice that in average, people with longer employment duration are less likely to borrow.
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+qplot(data=data_o,x=CreditScoreRangeLower)
+qplot(data=data_o,x=CreditScoreRangeUpper)
+with(data_o,cor.test(CreditScoreRangeLower,CreditScoreRangeUpper))
+```
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+qplot(data=data_o,x=CurrentCreditLines)
+qplot(data=data_o,x=TotalCreditLinespast7years)
+qplot(data=data_o,x=OpenRevolvingAccounts)
+qplot(data=data_o,x=OpenRevolvingMonthlyPayment)
+qplot(data=data_o,x=InquiriesLast6Months)
+qplot(data=data_o,x=TotalInquiries)
+qplot(data=data_o,x=CurrentDelinquencies)
+qplot(data=data_o,x=AmountDelinquent)
+qplot(data=data_o,x=DelinquenciesLast7Years)
+qplot(data=data_o,x=PublicRecordsLast10Years)
+qplot(data=data_o,x=PublicRecordsLast12Months)
+qplot(data=data_o,x=RevolvingCreditBalance)
+```
+Above nine graphs have extremely high count near zero, and extremely high value with low counts, and thus may not be useful on their own.
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+qplot(data=data_o,x=BankcardUtilization)
+ggplot(data=data_o,aes(x=BankcardUtilization))+geom_histogram(binwidth = 0.01)+xlim(0,quantile(data_o$BankcardUtilization,0.99,na.rm = TRUE))+ylim(0,2500)
+```
+about 1% out of all borrower have BantcardUtilization greater than 1.
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+qplot(data=data_o,x=AvailableBankcardCredit)
+ggplot(data = data_o,aes(x=AvailableBankcardCredit))+geom_histogram()+xlim(0,quantile(data_o$AvailableBankcardCredit,0.999,na.rm = TRUE))+scale_y_log10()
+```
+Notice that count of AvailableBankCredit decreases almost exponentially as the value increases.
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+qplot(data=data_o,x=TotalTrades)
+qplot(data=data_o,x=TradesNeverDelinquent..percentage.)
+qplot(data=data_o,x=TradesOpenedLast6Months)
+qplot(data=data_o,x=DebtToIncomeRatio)
+qplot(data=data_o,x=StatedMonthlyIncome)
+qplot(data=data_o,x=TotalProsperLoans)
+qplot(data=data_o,x=TotalProsperPaymentsBilled)
+qplot(data=data_o,x=OnTimeProsperPayments)
+```
+Above two graphs are quite similar
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+with(data_o,cor.test(TotalProsperPaymentsBilled,OnTimeProsperPayments))
+```
+High correlation indicates few people pay late.
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+qplot(data=data_o,x=ProsperPaymentsLessThanOneMonthLate)
+qplot(data=data_o,x=ProsperPaymentsOneMonthPlusLate)
+qplot(data=data_o,x=ProsperPrincipalBorrowed)
+qplot(data=data_o,x=ProsperPrincipalOutstanding)
+qplot(data=data_o,x=ScorexChangeAtTimeOfListing)
+qplot(data=data_o,x=LoanCurrentDaysDelinquent)
+qplot(data=data_o,x=LoanFirstDefaultedCycleNumber)
+qplot(data=data_o,x=LoanMonthsSinceOrigination)
+qplot(data=data_o,x=LoanOriginalAmount)
+qplot(data=data_o,x=MonthlyLoanPayment)
+qplot(data=data_o,x=LP_CustomerPayments)
+qplot(data=data_o,x=LP_CustomerPrincipalPayments)
+qplot(data=data_o,x=LP_InterestandFees)
+qplot(data=data_o,x=LP_ServiceFees)
+qplot(data=data_o,x=LP_CollectionFees)
+qplot(data=data_o,x=LP_GrossPrincipalLoss)
+qplot(data=data_o,x=LP_NetPrincipalLoss)
+qplot(data=data_o,x=LP_NonPrincipalRecoverypayments)
+qplot(data=data_o,x=PercentFunded)
+qplot(data=data_o,x=Recommendations)
+qplot(data=data_o,x=InvestmentFromFriendsCount)
+qplot(data=data_o,x=InvestmentFromFriendsAmount)
+qplot(data=data_o,x=Investors)
+```
+
 
 
