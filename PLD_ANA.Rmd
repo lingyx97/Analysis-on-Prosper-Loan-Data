@@ -6,6 +6,8 @@ output: html_document
 ```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
 library(ggplot2)
 library(dplyr)
+library(gridExtra)
+library(GGally)
 ```
 
 ```{r echo=FALSE, Load_The_Data}
@@ -18,7 +20,7 @@ str(data_o)
 ```
 ##Some Basic Overviews on The Dateset
 ```{r echo=FALSE}
-# find all categorical variables
+#find all categorical variables
 data_sub_cat <- data_o[sapply(data_o,is.factor)]
 names(data_sub_cat)
 ```
@@ -49,7 +51,7 @@ Over 2/3 of the total observations do not have CreditGrade
   
 Some variables related to delinquencies have skewed obervations.
 
-##Univariante Graphs
+##Univariante Graphs and Basic Analysis
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 #Univariate Graphs
 qplot(data = subset(data_o,CreditGrade!=''),x=CreditGrade)
@@ -57,6 +59,7 @@ qplot(data=data_o,x=Term)
 ```
 
 Only Three Possible Terms are allowed. (One year, Three years, and five years)
+ 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 qplot(data=data_o,x=BorrowerAPR)
 qplot(data=data_o,x=BorrowerRate)
@@ -66,6 +69,7 @@ qplot(data=data_o,x=EstimatedLoss)
 ```
 
 The above five graphs are quite similar because BorrowerAPR, EstimatedEffectiveYield and LenderYield are BorrowerRate minusing some comparatively small percentages or constants (e.g. servicing fee), and EstimatedLoss should be a percentage of BorrowerRate plusing some constant.
+ 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 cor.test(data_o$BorrowerAPR,data_o$BorrowerRate,method = 'pearson')
 cor.test(data_o$LenderYield,data_o$BorrowerRate,method = 'pearson')
@@ -76,12 +80,14 @@ cor.test(data_o$EstimatedLoss,data_o$BorrowerRate,method = 'pearson')
 The pearson correlation test also suggests strong correlation between BorrowerRate and other four variables.
   
 The correlation between EstimateedEffectiveYield and BorrowerRate is 0.5% less than 0.9 may due to the involving of late fee and charge-off loss.
+ 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 qplot(data = data_o,x=EstimatedReturn)
 qqnorm(with(subset(data_o,!is.na(EstimatedReturn)),EstimatedReturn-mean(EstimatedReturn)))
 ```
 
 EstimatedReturn is not symmetrically distributed around mean.
+ 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 qplot(data=data_o,x=EstimatedReturn,bins=500)
 data_o.sum_by_EstRet <- subset(data_o,!is.na(EstimatedReturn)) %>%
@@ -92,6 +98,7 @@ head(data_o.sum_by_EstRet)
 ```
 
 A closer look indicates that some specific values (e.g. 0.1246) have extremely high count.
+ 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 data_o.sum_by_BorRat <- subset(data_o,!is.na(BorrowerRate)) %>%
   group_by(BorrowerRate) %>%
@@ -101,6 +108,7 @@ head(data_o.sum_by_BorRat)
 ```
 
 Counting the frequency of each value of BorrowerRate. One possibile cause of high-count EstimateReturn may be a high count of BorrowerRate at 0.3177.
+ 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 # qplot(data=data_o,x=ProsperRating..numeric.)
 # qplot(data=data_o,x=ProsperScore)
@@ -113,6 +121,7 @@ ggplot(data = data_o,aes(x=EmploymentStatusDuration))+
 ```
 
 Notice that in average, people with longer employment duration are less likely to borrow.
+ 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 qplot(data=data_o,x=CreditScoreRangeLower)
 qplot(data=data_o,x=CreditScoreRangeUpper)
@@ -134,18 +143,21 @@ qplot(data=data_o,x=RevolvingCreditBalance)
 ```
 
 Above nine graphs have extremely high count near zero, and extremely high value with low counts, and thus may not be useful on their own.
+ 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 qplot(data=data_o,x=BankcardUtilization)
 ggplot(data=data_o,aes(x=BankcardUtilization))+geom_histogram(binwidth = 0.01)+xlim(0,quantile(data_o$BankcardUtilization,0.99,na.rm = TRUE))+ylim(0,2500)
 ```
 
 about 1% out of all borrower have BantcardUtilization greater than 1.
+ 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 qplot(data=data_o,x=AvailableBankcardCredit)
 ggplot(data = data_o,aes(x=AvailableBankcardCredit))+geom_histogram()+xlim(0,quantile(data_o$AvailableBankcardCredit,0.999,na.rm = TRUE))+scale_y_log10()
 ```
 
 Notice that count of AvailableBankCredit decreases almost exponentially as the value increases.
+ 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 # qplot(data=data_o,x=TotalTrades)
 # qplot(data=data_o,x=TradesNeverDelinquent..percentage.)
@@ -158,11 +170,13 @@ qplot(data=data_o,x=OnTimeProsperPayments)
 ```
 
 Above two graphs are quite similar
+ 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 with(data_o,cor.test(TotalProsperPaymentsBilled,OnTimeProsperPayments))
 ```
 
 High correlation indicates that fewer people pay late.
+ 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 qplot(data=data_o,x=ProsperPaymentsLessThanOneMonthLate)+ylim(0,100)
 # qplot(data=data_o,x=ProsperPaymentsOneMonthPlusLate)
@@ -172,6 +186,7 @@ ggplot(data=data_o,aes(x=ScorexChangeAtTimeOfListing))+geom_histogram(binwidth =
 ```
 
 There are some extremely high counts for some of the scores.
+ 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 data_o.sum_by_Scorex <- subset(data_o,!is.na(ScorexChangeAtTimeOfListing)) %>%
   group_by(ScorexChangeAtTimeOfListing) %>%
@@ -179,6 +194,7 @@ data_o.sum_by_Scorex <- subset(data_o,!is.na(ScorexChangeAtTimeOfListing)) %>%
   arrange(desc(n))
 head(data_o.sum_by_Scorex)
 ```
+ 
 0, +/-40, and +/-80 are the outliers.
 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
@@ -208,10 +224,73 @@ with(data_o,cor.test(ProsperScore,Recommendations))
 # qplot(data=data_o,x=InvestmentFromFriendsAmount)
 # qplot(data=data_o,x=Investors)
 ```
-Some loans have comparatively high recommendations while most loans have no recommendation. Although by summarising, loans with more recommendations tend to have higher Prosper Scores, but corelation test tells us nothing. This may due to dominantly high count of zero recommendations. 
-```{r warning=FALSE, echo=FALSE, message=FALSE}
 
+Some loans have comparatively high recommendations while most loans have no recommendation. Although by summarising, loans with more recommendations tend to have higher Prosper Scores, but corelation test tells us nothing. This may due to dominantly high count of zero recommendations. 
+
+##More Analysis
+
+Firstly I will investigate the relationship between the nine similar distributed variables.
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+set.seed(436346)
+data_samp<-data_o[sample(1:nrow(data_o),10000),c('OpenRevolvingMonthlyPayment','InquiriesLast6Months','TotalInquiries','CurrentDelinquencies','AmountDelinquent','DelinquenciesLast7Years','PublicRecordsLast10Years','PublicRecordsLast12Months','RevolvingCreditBalance')]
+ggpairs(data_samp,axisLabels='internal')
+# unable to change font size of axis labels for ggpairs.
+```
+
+The graph indicates that there is no strong relationship between any pairs of them. Similarity in graphs may simply caused by large count of zeros.
+ 
+Also, notice that there are several different scores in the dataset: CreditGrade, ProsperRating, ProsperScore, ScorexChangeAtTimeOfListing.The four scores should agree with each other.
+ 
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+plot1<-ggplot(data=subset(data_o,data_o$CreditGrade!=''),aes(x=CreditGrade))+geom_bar()
+plot2<-ggplot(data=subset(data_o,!is.na(data_o$ProsperScore)),aes(x=ProsperScore))+geom_bar()
+plot3<-ggplot(data=subset(data_o,!is.na(data_o$ProsperRating..numeric.)),aes(x=ProsperRating..numeric.))+geom_bar()
+plot4<-ggplot(data=subset(data_o,!is.na(data_o$ScorexChangeAtTimeOfListing)),aes(x=ScorexChangeAtTimeOfListing))+geom_bar()
+grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
+```
+
+However, Graphs of the four scores are quite different.
+
+A question then arises: What are these four scores?
+
+According to [the discription document](https://docs.google.com/spreadsheets/d/1gDyi_L4UvIrLTEC6Wri5nbaMmkGmLQBk-Yx3z0XDEtI/edit#gid=0), CreditGrade was the credit rating before 2009, and ProsperScore/ProsperRating was the credit rating after July 2009. The ScorexChangeAtTimeOfListing is the change in score between each loan of a specific borrower. 
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+ggplot(aes(x=ProsperScore,y=ProsperRating..numeric.),data=data_o)+geom_point(position = 'jitter',alpha=1/50)
+```
+
+According to the graph, ProsperScore and ProsperRating agree with each other in trend, but disagree with each other in many profiles. Therefore a question arises: which score is more reliable?
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+#create new a variable to classify profiles by year
+data_o$YearCreditPulled<-format(as.POSIXct(data_o$DateCreditPulled),'%Y')
+table(data_o$YearCreditPulled)
+```
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+#create a subset that only contains information about members that appear twice or more.
+Dup_Member<-unique(subset(data_o,duplicated(MemberKey))$MemberKey)
+data_o.sum_by_scores<-subset(data_o,(!is.na(ProsperScore) & !is.na(ProsperRating..numeric.) & is.element(MemberKey,Dup_Member)))
+  
 ```
 
 
 
+
+
+
+
+
+
+
+The following variables may relate to the ProsperScore:
+
+EstimatedReturn, ListingCategory, Occupation, EmploymentStatusDuration, IsBorrowerHomeOwner, GroupKey, DelinquenciesLast7Years, PublicRecordsLast12Months, IncomeVerifiable, TotalProsper, OnTimeProsperPayments, ProsperPaymentsOneMonthPlusLate, Recommendations
+
+Effect of them will be investigated separately.
+ 
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+```
+
+creditline
