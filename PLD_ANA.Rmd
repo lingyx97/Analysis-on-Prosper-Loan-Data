@@ -264,33 +264,97 @@ According to the graph, ProsperScore and ProsperRating agree with each other in 
 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 #create new a variable to classify profiles by year
-data_o$YearCreditPulled<-format(as.POSIXct(data_o$DateCreditPulled),'%Y')
-table(data_o$YearCreditPulled)
+data_o$YearCreditPulled<-as.numeric(format(as.POSIXct(data_o$DateCreditPulled),'%Y'))
 ```
 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 #create a subset that only contains information about members that appear twice or more.
-Dup_Member<-unique(subset(data_o,duplicated(MemberKey))$MemberKey)
-data_o.sum_by_scores<-subset(data_o,(!is.na(ProsperScore) & !is.na(ProsperRating..numeric.) & is.element(MemberKey,Dup_Member)))
-  
+data_o_after2009<-subset(data_o,YearCreditPulled >= 2009)
+
+Dup_Member.member <- sort(unique(subset(data_o_after2009,!is.na(ProsperScore) & !is.na(ProsperRating..numeric.) & duplicated(MemberKey))$MemberKey))
+
+Dup_Member.data<-subset(data_o_after2009,is.element(MemberKey,Dup_Member.member))
+
+Dup_Member.data_earlier<-with(Dup_Member.data,aggregate(list(year=YearCreditPulled,score=ProsperScore,rating=ProsperRating..numeric.),list(id=MemberKey),min))
+
+Dup_Member.data_later<-with(Dup_Member.data,aggregate(list(year=YearCreditPulled,delinq=AmountDelinquent),list(id=MemberKey),max))
+
+Dup_Member.data_earlier<-Dup_Member.data_earlier[with(Dup_Member.data_earlier,order(id)),]
+
+Dup_Member.data_later<-Dup_Member.data_later[with(Dup_Member.data_later,order(id)),]
+
+Dup_Member_data<-cbind(Dup_Member.data_later['year']-Dup_Member.data_earlier['year'],Dup_Member.data_earlier[,c(1,3,4)],Dup_Member.data_later['delinq'])
+
+Dup_Member_data$score<-factor(Dup_Member_data$score)
+Dup_Member_data$rating<-factor(Dup_Member_data$rating)
 ```
 
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+with(subset(Dup_Member_data,year!=0),aggregate(list(avg_delinq=delinq),list(score=score),mean))
+with(subset(Dup_Member_data,year!=0),aggregate(list(avg_delinq=delinq),list(rating=rating),mean))
+```
 
+Both the Score and the Rating are reliable in the sense that people with highest scores/ratings have least average delinquencies in the 'future', and people with lowest scores/ratings have most average delinquencies in the 'future'.
 
+However, average delinquency of people with higher ratings is lower than that of people with lower ratings, while average delinquencies of people with some scores (<2,3,4>,<5,6,7>) are approximately the same.
 
+Therefore, the rating might be a more appropriate measure of people's credit.
 
+The next question is: what kinds of profiles tend to have a higher rating?
 
+The following variables may relate to the ProsperRating:
 
-
-
-
-The following variables may relate to the ProsperScore:
-
-EstimatedReturn, ListingCategory, Occupation, EmploymentStatusDuration, IsBorrowerHomeOwner, GroupKey, DelinquenciesLast7Years, PublicRecordsLast12Months, IncomeVerifiable, TotalProsper, OnTimeProsperPayments, ProsperPaymentsOneMonthPlusLate, Recommendations
+EstimatedReturn, ListingCategory, Occupation, EmploymentStatusDuration, IsBorrowerHomeowner, GroupKey, DelinquenciesLast7Years, PublicRecordsLast12Months, IncomeVerifiable, OnTimeProsperPayments, ProsperPaymentsOneMonthPlusLate, Recommendations
 
 Effect of them will be investigated separately.
  
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
+ggplot(data=data_o,aes(y=EstimatedReturn,x=factor(ProsperRating..numeric.)))+geom_boxplot()
+
+with(subset(data_o,!is.na(ProsperRating..numeric.)),cor.test(ProsperRating..numeric.,ListingCategory..numeric.))
+
+ggplot(data=data_o,aes(x=Occupation,y=ProsperRating..numeric.))+geom_boxplot()+stat_summary(fun.y='mean')
+
+with(subset(data_o,!is.na(ProsperRating..numeric.)&!is.na(EmploymentStatusDuration)),cor.test(ProsperRating..numeric.,EmploymentStatusDuration))
+with(subset(data_o,!is.na(ProsperRating..numeric.)&!is.na(EmploymentStatusDuration)),aggregate(list(avg_employment_dur=EmploymentStatusDuration),list(rating=ProsperRating..numeric.),mean))
+
+wilcox.test(subset(data_o,!is.na(ProsperRating..numeric.)&IsBorrowerHomeowner=='True')$ProsperRating..numeric.,subset(data_o,!is.na(ProsperRating..numeric.)&IsBorrowerHomeowner=='False')$ProsperRating..numeric.,alternative='greater')
+
+subset(data_o,!is.na(ProsperRating..numeric.)&GroupKey!='') %>%
+  group_by(GroupKey) %>%
+  summarise(avg_rating=mean(ProsperRating..numeric.),
+            n=n()) %>%
+  arrange(desc(avg_rating)) %>%
+  filter(n>=10) %>%
+  summary()
+
+ggplot(aes(x=factor(ProsperRating..numeric.),y=DelinquenciesLast7Years),data=subset(data_o,!is.na(ProsperRating..numeric.)))+geom_boxplot()+scale_y_log10()
+with(subset(data_o,!is.na(ProsperRating..numeric.)),cor.test(ProsperRating..numeric.,DelinquenciesLast7Years))
+
+wilcox.test(subset(data_o,!is.na(ProsperRating..numeric.)&PublicRecordsLast12Months==0)$ProsperRating..numeric.,subset(data_o,!is.na(ProsperRating..numeric.)&PublicRecordsLast12Months!=0)$ProsperRating..numeric.,alternative = 'greater')
+
+wilcox.test(subset(data_o,!is.na(ProsperRating..numeric.)&IncomeVerifiable=='True')$ProsperRating..numeric. ,subset(data_o,!is.na(ProsperRating..numeric.)&IncomeVerifiable=='False')$ProsperRating..numeric. ,alternative = 'greater')
+
+ggplot(aes(x=factor(ProsperRating..numeric.),y=OnTimeProsperPayments),data=subset(data_o,!is.na(ProsperRating..numeric.)))+geom_boxplot()+scale_y_log10()
+with(subset(data_o,!is.na(ProsperRating..numeric.)),cor.test(ProsperRating..numeric.,OnTimeProsperPayments))
+
+ggplot(aes(x=factor(ProsperRating..numeric.),y=ProsperPaymentsOneMonthPlusLate),data=subset(data_o,!is.na(ProsperRating..numeric.)))+geom_boxplot()+scale_y_log10()
+with(subset(data_o,!is.na(ProsperRating..numeric.)),cor.test(ProsperRating..numeric.,ProsperPaymentsOneMonthPlusLate))
+
+wilcox.test(subset(data_o,!is.na(ProsperRating..numeric.)&Recommendations!=0)$ProsperRating..numeric.,subset(data_o,!is.na(ProsperRating..numeric.)&Recommendations==0)$ProsperRating..numeric.,alternative = 'greater')
 ```
 
-creditline
+EstimatedReturn, IncomeVerifiable and IsBorrowerHomeowner are directly related to the rating;
+
+Some Occupations have different mean and variance than others, but may due to the small sample size;
+
+Mean Employement Duration of all users are approximately the same. although those who are rated 1, 2, and 3 have approximately 10% lower values than those who are rated 4, 5, and 6, those who are rated 7 have average employment duartion between the two groups;
+
+
+GroupKey may have correlation with average rating, but there are just too many group keys, so it is difficult to make a conclution about it;
+
+DelinquentLast7Years has no strong correlation with ratings, but those who are rated 7 have significantly lower deliquencies;
+
+Those who have PublicRecordsLast12Months equal to zero have higher average ratings by wilcox test;
+
+ProsperPaymentsOneMonthPlusLate of those who are rated 5, 6, and 7 have decreasing means on payments that are paid more than one month late.
