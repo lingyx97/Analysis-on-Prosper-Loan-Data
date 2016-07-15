@@ -8,6 +8,7 @@ library(ggplot2)
 library(dplyr)
 library(gridExtra)
 library(GGally)
+library(scales)
 ```
 
 ```{r echo=FALSE, Load_The_Data}
@@ -351,10 +352,43 @@ Some Occupations have different mean and variance than others, but may due to th
 Mean Employement Duration of all users are approximately the same. although those who are rated 1, 2, and 3 have approximately 10% lower values than those who are rated 4, 5, and 6, those who are rated 7 have average employment duartion between the two groups;
 
 
-GroupKey may have correlation with average rating, but there are just too many group keys, so it is difficult to make a conclution about it;
+GroupKey may have correlation with average rating, but there are just too many group keys, so it is difficult to make a conclusion about it;
 
 DelinquentLast7Years has no strong correlation with ratings, but those who are rated 7 have significantly lower deliquencies;
 
 Those who have PublicRecordsLast12Months equal to zero have higher average ratings by wilcox test;
 
 ProsperPaymentsOneMonthPlusLate of those who are rated 5, 6, and 7 have decreasing means on payments that are paid more than one month late.
+
+##Final Plots
+```{r echo=FALSE, Final_Plot_1}
+#Final Plot 1
+ggplot(data=subset(data_o,InvestmentFromFriendsAmount!=0),aes(x=DebtToIncomeRatio ,y=InvestmentFromFriendsAmount/LoanOriginalAmount))+
+  geom_point()+
+  stat_sum(aes(color=factor(ListingCategory..numeric.),,size=StatedMonthlyIncome))+
+  xlim(0,quantile(data_o$DebtToIncomeRatio,0.99,na.rm = TRUE))+
+  ggtitle('Debt-to-Income Ratio against Investment from Friend to Total Original Loan Ratio (colored by listing category)')
+
+ggplot(data=subset(data_o,(InvestmentFromFriendsAmount!=0 & !(ListingCategory..numeric. %in% c(0,1,4,6,7))) & IncomeVerifiable=='True'),aes(x=DebtToIncomeRatio ,y=InvestmentFromFriendsAmount/LoanOriginalAmount))+
+  geom_point(alpha=0)+
+  stat_sum(aes(color=factor(ListingCategory..numeric.),size=StatedMonthlyIncome))+
+  scale_x_continuous(breaks=pretty_breaks(n=100))+
+  scale_y_continuous(breaks=pretty_breaks(n=10))+
+  xlim(0,quantile(data_o$DebtToIncomeRatio,0.99,na.rm=TRUE))+
+  scale_radius(trans='sqrt',range=c(1,5))+
+  ggtitle('Debt-to-Income Ratio against Investment from Friend to Total Original Loan Ratio (colored by listing filtered category)')
+```
+
+Obviously, people with heigher debt-to-income ratio have lower percentage of friend investment. Most of those who have 100% friend investment belong to category- 0 (Not Available), 1 (Debt Consolidation), 4 (Personal Loan), and 6 (Auto), which are all non-informative. By filtering out those obscure categories, I got the second graph.
+
+Only those who are in the categories: 2 (Home Improvement), 3 (Business), 5 (Student Use),and 13 (Household expenses). Actually most loans with non-zero friend investment are for home improvement and business.
+
+Those who applied for a loan while having a large income are very likely to be in category 2 (Home Improvement)
+
+```{r echo=FALSE, Final_Plot_2}
+#Final Plot 2
+ggplot(data_o,aes(StatedMonthlyIncome,TradesNeverDelinquent..percentage.,color=IncomeVerifiable ,size=TotalTrades))+geom_point()+xlim(0,quantile(data_o$StatedMonthlyIncome,0.95))
+
+```
+
+
