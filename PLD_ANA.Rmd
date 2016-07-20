@@ -2,6 +2,11 @@
 title: "Prosper Loan Data Analysis by Yuxun Ling"
 output: html_document
 ---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=15, fig.height=10, echo=FALSE, warning=FALSE, message=FALSE)
+```
+
 ##Loading Dataset and Libraries
 ```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
 library(ggplot2)
@@ -9,6 +14,7 @@ library(dplyr)
 library(gridExtra)
 library(GGally)
 library(scales)
+library(lubridate)
 ```
 
 ```{r echo=FALSE, Load_The_Data}
@@ -365,7 +371,7 @@ ProsperPaymentsOneMonthPlusLate of those who are rated 5, 6, and 7 have decreasi
 #Final Plot 1
 ggplot(data=subset(data_o,InvestmentFromFriendsAmount!=0),aes(x=DebtToIncomeRatio ,y=InvestmentFromFriendsAmount/LoanOriginalAmount))+
   geom_point()+
-  stat_sum(aes(color=factor(ListingCategory..numeric.),,size=StatedMonthlyIncome))+
+  stat_sum(aes(color=factor(ListingCategory..numeric.),size=StatedMonthlyIncome))+
   xlim(0,quantile(data_o$DebtToIncomeRatio,0.99,na.rm = TRUE))+
   ggtitle('Debt-to-Income Ratio against Investment from Friend to Total Original Loan Ratio (colored by listing category)')
 
@@ -387,8 +393,44 @@ Those who applied for a loan while having a large income are very likely to be i
 
 ```{r echo=FALSE, Final_Plot_2}
 #Final Plot 2
-ggplot(data_o,aes(StatedMonthlyIncome,TradesNeverDelinquent..percentage.,color=IncomeVerifiable ,size=TotalTrades))+geom_point()+xlim(0,quantile(data_o$StatedMonthlyIncome,0.95))
-
+ggplot(subset(data_o,!is.na(ProsperRating..numeric.)&IncomeVerifiable=='True'),aes(StatedMonthlyIncome,TradesNeverDelinquent..percentage.,color=factor(ProsperRating..numeric.)))+geom_point(alpha=0.8)+xlim(0,quantile(data_o$StatedMonthlyIncome,0.99))+scale_color_manual(values=c('1'='green','2'='green','3'='grey','4'='grey','5'='grey','6'='orange','7'='orange'))+ggtitle('Proportion of Non-Delinquent Trades Against Monthly Income (colored by prosper rating)')
 ```
 
+Generally, the lower bound of percentage of trades that never delinquent increases as stated monthly income increases, and profiles with higher prosper ratings tend to have higher income (no causation implied). There are still some green points lying on the top right corner of the graph, which is an unexplainable phenomenon by the graph.
 
+
+```{r echo=F, Final_Plot_3}
+#Final Plot 3
+data_o$LoanOriginationDate<-as.POSIXct(strptime(data_o$LoanOriginationDate, "%Y-%m-%d %H:%M:%S"))
+
+ggplot(data_o,aes(LoanOriginationDate,LoanOriginalAmount))+geom_point(alpha=0.1,color='purple')+ggtitle('Loan Amount Against Loan Origination Date')+scale_x_datetime(breaks=date_breaks('3 months'))+theme(axis.text.x=element_text(angle=75,hjust=1,vjust=0.5))
+
+data_o$LoanOriginationDate_m<-floor_date(data_o$LoanOriginationDate,'month')
+data_o.sum_by_LoanOrigDate<-subset(data_o,!is.na(LoanOriginationDate)) %>%
+  group_by(LoanOriginationDate_m) %>%
+  summarise(LoanOriginalAmount=sum(LoanOriginalAmount)) %>%
+  arrange(desc(LoanOriginalAmount))
+names(data_o.sum_by_LoanOrigDate)<-c('LoanOriginationDate','LoanOriginalAmount')
+head(data_o.sum_by_LoanOrigDate)
+ggplot(data_o.sum_by_LoanOrigDate,aes(LoanOriginationDate,LoanOriginalAmount))+geom_line()+scale_x_datetime(breaks=date_breaks('3 months'))+theme(axis.text.x=element_text(angle=75,hjust=1,vjust=0.5))+ggtitle('Totoal Loan per Month Against Loan Origination Month')
+```
+
+from 2006 to 2009, the loan amounts each period were quite consistent. 
+
+From the end of 2008 to mid of 2009, however, the website processed no loan. The penomenon coincides with the outburst of Global Financial Crisis. 
+
+Total loan amounts remained at a relatively low level (compared to that before the financial crisis) until the begining of 2011, when the website seemed to have increased the minimum amout of loan permited and the total loan amount increased dramatically in the next few months. At about the same time, the US was running into the debt-ceiling crisis, but there is no obvius explanation of the relation between them.
+
+The total amount of loan processed at the end of 2012 dropped dramatically until the begining of 2013. Not sure what happened during the period
+
+The final big change is at the end of the first quarter 2013. The maximum amount of loan allowed seemed to be increased to 35,000 from 25,000. The total loan amount increased almost every month since then.
+
+##Reflection
+
+There are too many variables, and most of them are new to me. I spent a lot of time investigating into them and although at last I still don't know what some of them mean, but at least I can start some analysis on the ones I figured out.
+
+Another similar problem is that although I know what some variables mean, but I am still not sure where do they come from. For example, the prosper rating may be a factor calculated from some other variables, and thus all my analysis on it could be completely nonsense. Without knowing which variables are defined by other variables and which were directly observed (or surveyed), it is really hard to ask suitable questions.
+
+Relations between many of the variables are also very week. For example, looking at the second final graph, if I make orange points yellow, and green points red, then the graph will show dominantly large amount of red points on the top-right corner of the graph. Similarly, there are many highly rated people on the very left of the graph. Although by grouping I can easily conclude that in general people with higher ratings have higher average income, but there are too many unexplainable exceptions. Similar problems apply to many other pairs of variables.
+
+Despite all the problems described above, I still tried to make some graph that may convey some (though very limited) interest information. Hope whoever read the report would like it.

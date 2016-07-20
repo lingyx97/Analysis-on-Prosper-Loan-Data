@@ -1,2 +1,3 @@
-http://stackoverflow.com/questions/17964513/subset-variables-in-data-frame-based-on-column-type
 https://docs.google.com/spreadsheets/d/1gDyi_L4UvIrLTEC6Wri5nba
+Wikipedia of all variables (if exist)
+Wikipedia of financial crisis
