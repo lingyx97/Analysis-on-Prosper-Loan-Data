@@ -8,13 +8,14 @@ knitr::opts_chunk$set(fig.width=15, fig.height=10, echo=FALSE, warning=FALSE, me
 ```
 
 ##Loading Dataset and Libraries
-```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+```{r packages}
 library(ggplot2)
 library(dplyr)
 library(gridExtra)
 library(GGally)
 library(scales)
 library(lubridate)
+library(corrplot)
 ```
 
 ```{r echo=FALSE, Load_The_Data}
@@ -59,20 +60,27 @@ Over 2/3 of the total observations do not have CreditGrade
 Some variables related to delinquencies have skewed obervations.
 
 ##Univariante Graphs and Basic Analysis
-```{r warning=FALSE, echo=FALSE, message=FALSE}
+```{r}
 #Univariate Graphs
-qplot(data = subset(data_o,CreditGrade!=''),x=CreditGrade)
-qplot(data=data_o,x=Term)
+
+#Design a function for simplicity
+basic_plot <- function(var_i){
+  qplot(data=subset(data_o,eval(as.name(paste(var_i)))!=''),
+        x=eval(as.name(paste(var_i))),xlab=var_i)
+}
+
+#Start drawing
+basic_plot("CreditGrade")
+
+data_o$Term<-factor(data_o$Term)
+basic_plot("Term")
 ```
 
 Only Three Possible Terms are allowed. (One year, Three years, and five years)
  
-```{r warning=FALSE, echo=FALSE, message=FALSE}
-qplot(data=data_o,x=BorrowerAPR)
-qplot(data=data_o,x=BorrowerRate)
-qplot(data=data_o,x=LenderYield)
-qplot(data=data_o,x=EstimatedEffectiveYield)
-qplot(data=data_o,x=EstimatedLoss)
+```{r}
+lapply(c("BorrowerAPR","BorrowerRate","LenderYield","EstimatedEffectiveYield","EstimatedLoss"),
+       basic_plot)
 ```
 
 The above five graphs are quite similar because BorrowerAPR, EstimatedEffectiveYield and LenderYield are BorrowerRate minusing some comparatively small percentages or constants (e.g. servicing fee), and EstimatedLoss should be a percentage of BorrowerRate plusing some constant.
@@ -88,14 +96,15 @@ The pearson correlation test also suggests strong correlation between BorrowerRa
   
 The correlation between EstimateedEffectiveYield and BorrowerRate is 0.5% less than 0.9 may due to the involving of late fee and charge-off loss.
  
-```{r warning=FALSE, echo=FALSE, message=FALSE}
-qplot(data = data_o,x=EstimatedReturn)
-qqnorm(with(subset(data_o,!is.na(EstimatedReturn)),EstimatedReturn-mean(EstimatedReturn)))
+```{r}
+basic_plot("EstimatedReturn")
+qqnorm(with(subset(data_o,!is.na(EstimatedReturn)),
+            EstimatedReturn-mean(EstimatedReturn)))
 ```
 
 EstimatedReturn is not symmetrically distributed around mean.
  
-```{r warning=FALSE, echo=FALSE, message=FALSE}
+```{r}
 qplot(data=data_o,x=EstimatedReturn,bins=500)
 data_o.sum_by_EstRet <- subset(data_o,!is.na(EstimatedReturn)) %>%
   group_by(EstimatedReturn) %>%
@@ -106,7 +115,7 @@ head(data_o.sum_by_EstRet)
 
 A closer look indicates that some specific values (e.g. 0.1246) have extremely high count.
  
-```{r warning=FALSE, echo=FALSE, message=FALSE}
+```{r}
 data_o.sum_by_BorRat <- subset(data_o,!is.na(BorrowerRate)) %>%
   group_by(BorrowerRate) %>%
   summarise(n=n()) %>%
@@ -116,12 +125,11 @@ head(data_o.sum_by_BorRat)
 
 Counting the frequency of each value of BorrowerRate. One possibile cause of high-count EstimateReturn may be a high count of BorrowerRate at 0.3177.
  
-```{r warning=FALSE, echo=FALSE, message=FALSE}
+```{r}
 # qplot(data=data_o,x=ProsperRating..numeric.)
 # qplot(data=data_o,x=ProsperScore)
 qplot(data=data_o,x=EmploymentStatusDuration)
-```
-```{r warning=FALSE, echo=FALSE, message=FALSE}
+
 ggplot(data = data_o,aes(x=EmploymentStatusDuration))+
   geom_histogram(binwidth = 3)+
   xlim(c(0,600))
@@ -129,38 +137,66 @@ ggplot(data = data_o,aes(x=EmploymentStatusDuration))+
 
 Notice that in average, people with longer employment duration are less likely to borrow.
  
-```{r warning=FALSE, echo=FALSE, message=FALSE}
+```{r}
 qplot(data=data_o,x=CreditScoreRangeLower)
 qplot(data=data_o,x=CreditScoreRangeUpper)
 with(data_o,cor.test(CreditScoreRangeLower,CreditScoreRangeUpper))
-```
-```{r warning=FALSE, echo=FALSE, message=FALSE}
+
 # qplot(data=data_o,x=CurrentCreditLines)
 # qplot(data=data_o,x=TotalCreditLinespast7years)
 # qplot(data=data_o,x=OpenRevolvingAccounts)
-qplot(data=data_o,x=OpenRevolvingMonthlyPayment)
-qplot(data=data_o,x=InquiriesLast6Months)
-qplot(data=data_o,x=TotalInquiries)
-qplot(data=data_o,x=CurrentDelinquencies)
-qplot(data=data_o,x=AmountDelinquent)
-qplot(data=data_o,x=DelinquenciesLast7Years)
-qplot(data=data_o,x=PublicRecordsLast10Years)
-qplot(data=data_o,x=PublicRecordsLast12Months)
-qplot(data=data_o,x=RevolvingCreditBalance)
+
+log10_plot_c <- function(var_i){
+  ggplot(data=subset(data_o,eval(as.name(paste(var_i)))!=''),
+        aes(eval(as.name(paste(var_i)))))+
+    geom_histogram(binwidth=
+                     mean(data_o[,var_i],na.rm=T)/50)+
+    xlab(var_i)+
+    scale_y_log10()+
+    scale_x_continuous(limits=c(0,with(data_o,
+                                       quantile(eval(as.name(paste(var_i))),
+                                                0.99,na.rm = T))))
+}
+
+log10_plot_d <- function(var_i){
+  ggplot(data=subset(data_o,eval(as.name(paste(var_i)))!=''),
+        aes(eval(as.name(paste(var_i)))))+
+    geom_bar()+
+    xlab(var_i)+
+    scale_y_log10()+
+    xlim(-1,with(data_o,
+                quantile(eval(as.name(paste(var_i))),0.999,na.rm=T)))
+}
+
+lapply(c("InquiriesLast6Months","TotalInquiries",
+         "CurrentDelinquencies","DelinquenciesLast7Years",
+         "PublicRecordsLast10Years","PublicRecordsLast12Months"),log10_plot_d)
+
+lapply(c("OpenRevolvingMonthlyPayment","AmountDelinquent",
+         "RevolvingCreditBalance"),
+       log10_plot_c)
+
+
 ```
 
 Above nine graphs have extremely high count near zero, and extremely high value with low counts, and thus may not be useful on their own.
  
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 qplot(data=data_o,x=BankcardUtilization)
-ggplot(data=data_o,aes(x=BankcardUtilization))+geom_histogram(binwidth = 0.01)+xlim(0,quantile(data_o$BankcardUtilization,0.99,na.rm = TRUE))+ylim(0,2500)
+ggplot(data=data_o,aes(x=BankcardUtilization))+
+  geom_histogram(binwidth = 0.01)+
+  xlim(0,quantile(data_o$BankcardUtilization,0.99,na.rm = TRUE))+
+  ylim(0,2500)
 ```
 
 about 1% out of all borrower have BantcardUtilization greater than 1.
  
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 qplot(data=data_o,x=AvailableBankcardCredit)
-ggplot(data = data_o,aes(x=AvailableBankcardCredit))+geom_histogram()+xlim(0,quantile(data_o$AvailableBankcardCredit,0.999,na.rm = TRUE))+scale_y_log10()
+ggplot(data = data_o,aes(x=AvailableBankcardCredit))+
+  geom_histogram()+
+  xlim(0,quantile(data_o$AvailableBankcardCredit,0.999,na.rm = TRUE))+
+  scale_y_log10()
 ```
 
 Notice that count of AvailableBankCredit decreases almost exponentially as the value increases.
@@ -189,7 +225,8 @@ qplot(data=data_o,x=ProsperPaymentsLessThanOneMonthLate)+ylim(0,100)
 # qplot(data=data_o,x=ProsperPaymentsOneMonthPlusLate)
 # qplot(data=data_o,x=ProsperPrincipalBorrowed)
 # qplot(data=data_o,x=ProsperPrincipalOutstanding)
-ggplot(data=data_o,aes(x=ScorexChangeAtTimeOfListing))+geom_histogram(binwidth = 1)
+ggplot(data=data_o,aes(x=ScorexChangeAtTimeOfListing))+
+  geom_histogram(binwidth = 1)
 ```
 
 There are some extremely high counts for some of the scores.
@@ -219,7 +256,9 @@ head(data_o.sum_by_Scorex)
 # qplot(data=data_o,x=LP_NetPrincipalLoss)
 # qplot(data=data_o,x=LP_NonPrincipalRecoverypayments)
 # qplot(data=data_o,x=PercentFunded)
-ggplot(data=data_o,aes(x=Recommendations))+geom_histogram(binwidth = 1)+scale_y_log10()
+ggplot(data=data_o,aes(x=Recommendations))+
+  geom_histogram(binwidth = 1)+scale_y_log10()
+
 data_o.sum_by_Recom <- subset(data_o,!is.na(Recommendations)) %>%
   group_by(Recommendations) %>%
   summarise(score=mean(ProsperScore,na.rm=TRUE),
@@ -234,26 +273,49 @@ with(data_o,cor.test(ProsperScore,Recommendations))
 
 Some loans have comparatively high recommendations while most loans have no recommendation. Although by summarising, loans with more recommendations tend to have higher Prosper Scores, but corelation test tells us nothing. This may due to dominantly high count of zero recommendations. 
 
-##More Analysis
+##Bi- and Multi-variate Graph and More Analysis
 
 Firstly I will investigate the relationship between the nine similar distributed variables.
 
-```{r warning=FALSE, echo=FALSE, message=FALSE}
-set.seed(436346)
-data_samp<-data_o[sample(1:nrow(data_o),10000),c('OpenRevolvingMonthlyPayment','InquiriesLast6Months','TotalInquiries','CurrentDelinquencies','AmountDelinquent','DelinquenciesLast7Years','PublicRecordsLast10Years','PublicRecordsLast12Months','RevolvingCreditBalance')]
-ggpairs(data_samp,axisLabels='internal')
-# unable to change font size of axis labels for ggpairs.
+```{r Multivariate_Graph}
+data_samp<-data_o[,
+                  c('OpenRevolvingMonthlyPayment',
+                    'InquiriesLast6Months','TotalInquiries',
+                    'CurrentDelinquencies','AmountDelinquent',
+                    'DelinquenciesLast7Years','PublicRecordsLast10Years',
+                    'PublicRecordsLast12Months','RevolvingCreditBalance')]
+
+corrplot.mixed(cor(data_samp,use='pairwise.complete.obs'),
+               tl.pos="lt",diag="n", 
+               lower = "square", 
+               upper = "number")
 ```
 
-The graph indicates that there is no strong relationship between any pairs of them. Similarity in graphs may simply caused by large count of zeros.
- 
+The graph indicates that there is no strong relationship between any pairs of them except (RevolvingCreditBalance, OpenRevolvingMonthlyPayment) and (TotalInquiries, InquiriesLast6Months), which are obviously related.
+
+It is also not suprising that public records over last 12 months and over last 10 years are not strongly related, because the two time intervals differ too much and the distribustion of public records in the long term differs from that in the short term (due to the increasing legal punishment received). 
+
+It is suprising that correlation between CurrenctDelinquencies and DelinquenciesLast7Years is relatively higher than that between AmountDelinquent and DelinquenciesLast7Years, but since both of them are very small (<0.5, and thus useless), the difference can be ignored.
+
 Also, notice that there are several different scores in the dataset: CreditGrade, ProsperRating, ProsperScore, ScorexChangeAtTimeOfListing.The four scores should agree with each other.
  
-```{r warning=FALSE, echo=FALSE, message=FALSE}
-plot1<-ggplot(data=subset(data_o,data_o$CreditGrade!=''),aes(x=CreditGrade))+geom_bar()
-plot2<-ggplot(data=subset(data_o,!is.na(data_o$ProsperScore)),aes(x=ProsperScore))+geom_bar()
-plot3<-ggplot(data=subset(data_o,!is.na(data_o$ProsperRating..numeric.)),aes(x=ProsperRating..numeric.))+geom_bar()
-plot4<-ggplot(data=subset(data_o,!is.na(data_o$ScorexChangeAtTimeOfListing)),aes(x=ScorexChangeAtTimeOfListing))+geom_bar()
+```{r}
+plot1<-ggplot(data=subset(data_o,data_o$CreditGrade!=''),
+              aes(x=CreditGrade))+
+  geom_bar()
+
+plot2<-ggplot(data=subset(data_o,!is.na(data_o$ProsperScore)),
+              aes(x=ProsperScore))+
+  geom_bar()
+
+plot3<-ggplot(data=subset(data_o,!is.na(data_o$ProsperRating..numeric.)),
+              aes(x=ProsperRating..numeric.))+
+  geom_bar()
+
+plot4<-ggplot(data=subset(data_o,!is.na(data_o$ScorexChangeAtTimeOfListing)),
+              aes(x=ScorexChangeAtTimeOfListing))+
+  geom_bar()
+
 grid.arrange(plot1,plot2,plot3,plot4,ncol=2)
 ```
 
@@ -264,41 +326,64 @@ A question then arises: What are these four scores?
 According to [the discription document](https://docs.google.com/spreadsheets/d/1gDyi_L4UvIrLTEC6Wri5nbaMmkGmLQBk-Yx3z0XDEtI/edit#gid=0), CreditGrade was the credit rating before 2009, and ProsperScore/ProsperRating was the credit rating after July 2009. The ScorexChangeAtTimeOfListing is the change in score between each loan of a specific borrower. 
 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
-ggplot(aes(x=ProsperScore,y=ProsperRating..numeric.),data=data_o)+geom_point(position = 'jitter',alpha=1/50)
+ggplot(aes(x=ProsperScore,y=ProsperRating..numeric.),
+       data=data_o)+
+  geom_point(position = 'jitter',alpha=1/50)
 ```
 
 According to the graph, ProsperScore and ProsperRating agree with each other in trend, but disagree with each other in many profiles. Therefore a question arises: which score is more reliable?
 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 #create new a variable to classify profiles by year
-data_o$YearCreditPulled<-as.numeric(format(as.POSIXct(data_o$DateCreditPulled),'%Y'))
+data_o$YearCreditPulled<-
+  as.numeric(format(as.POSIXct(data_o$DateCreditPulled),'%Y'))
 ```
 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
 #create a subset that only contains information about members that appear twice or more.
 data_o_after2009<-subset(data_o,YearCreditPulled >= 2009)
 
-Dup_Member.member <- sort(unique(subset(data_o_after2009,!is.na(ProsperScore) & !is.na(ProsperRating..numeric.) & duplicated(MemberKey))$MemberKey))
+Dup_Member.member <- 
+  sort(unique(subset(data_o_after2009,!is.na(ProsperScore) &
+                       !is.na(ProsperRating..numeric.) &
+                       duplicated(MemberKey))$MemberKey))
 
-Dup_Member.data<-subset(data_o_after2009,is.element(MemberKey,Dup_Member.member))
+Dup_Member.data<-
+  subset(data_o_after2009,is.element(MemberKey,Dup_Member.member))
 
-Dup_Member.data_earlier<-with(Dup_Member.data,aggregate(list(year=YearCreditPulled,score=ProsperScore,rating=ProsperRating..numeric.),list(id=MemberKey),min))
+Dup_Member.data_earlier<-
+  with(Dup_Member.data,
+       aggregate(list(year=YearCreditPulled,score=ProsperScore,rating=ProsperRating..numeric.),
+                 list(id=MemberKey),
+                 min))
 
-Dup_Member.data_later<-with(Dup_Member.data,aggregate(list(year=YearCreditPulled,delinq=AmountDelinquent),list(id=MemberKey),max))
+Dup_Member.data_later<-
+  with(Dup_Member.data,
+       aggregate(list(year=YearCreditPulled,delinq=AmountDelinquent),
+                 list(id=MemberKey),
+                 max))
 
-Dup_Member.data_earlier<-Dup_Member.data_earlier[with(Dup_Member.data_earlier,order(id)),]
+Dup_Member.data_earlier<-
+  Dup_Member.data_earlier[with(Dup_Member.data_earlier,order(id)),]
 
-Dup_Member.data_later<-Dup_Member.data_later[with(Dup_Member.data_later,order(id)),]
+Dup_Member.data_later<-
+  Dup_Member.data_later[with(Dup_Member.data_later,order(id)),]
 
-Dup_Member_data<-cbind(Dup_Member.data_later['year']-Dup_Member.data_earlier['year'],Dup_Member.data_earlier[,c(1,3,4)],Dup_Member.data_later['delinq'])
+Dup_Member_data<-
+  cbind(Dup_Member.data_later['year']-Dup_Member.data_earlier['year'],
+        Dup_Member.data_earlier[,c(1,3,4)],
+        Dup_Member.data_later['delinq'])
 
 Dup_Member_data$score<-factor(Dup_Member_data$score)
 Dup_Member_data$rating<-factor(Dup_Member_data$rating)
 ```
 
 ```{r warning=FALSE, echo=FALSE, message=FALSE}
-with(subset(Dup_Member_data,year!=0),aggregate(list(avg_delinq=delinq),list(score=score),mean))
-with(subset(Dup_Member_data,year!=0),aggregate(list(avg_delinq=delinq),list(rating=rating),mean))
+with(subset(Dup_Member_data,year!=0),
+     aggregate(list(avg_delinq=delinq),list(score=score),mean))
+
+with(subset(Dup_Member_data,year!=0),
+     aggregate(list(avg_delinq=delinq),list(rating=rating),mean))
 ```
 
 Both the Score and the Rating are reliable in the sense that people with highest scores/ratings have least average delinquencies in the 'future', and people with lowest scores/ratings have most average delinquencies in the 'future'.
@@ -315,17 +400,34 @@ EstimatedReturn, ListingCategory, Occupation, EmploymentStatusDuration, IsBorrow
 
 Effect of them will be investigated separately.
  
-```{r warning=FALSE, echo=FALSE, message=FALSE}
-ggplot(data=data_o,aes(y=EstimatedReturn,x=factor(ProsperRating..numeric.)))+geom_boxplot()
+```{r Bivariate_Graphs_and_Tests}
+ggplot(data=data_o,
+       aes(y=EstimatedReturn,x=factor(ProsperRating..numeric.)))+
+  geom_boxplot()
 
-with(subset(data_o,!is.na(ProsperRating..numeric.)),cor.test(ProsperRating..numeric.,ListingCategory..numeric.))
+with(subset(data_o,!is.na(ProsperRating..numeric.)),
+     cor.test(ProsperRating..numeric.,ListingCategory..numeric.))
 
-ggplot(data=data_o,aes(x=Occupation,y=ProsperRating..numeric.))+geom_boxplot()+stat_summary(fun.y='mean')
+ggplot(data=data_o,aes(x=Occupation,y=ProsperRating..numeric.))+
+  geom_boxplot()+
+  stat_summary(fun.y='mean')+
+  coord_flip()
 
-with(subset(data_o,!is.na(ProsperRating..numeric.)&!is.na(EmploymentStatusDuration)),cor.test(ProsperRating..numeric.,EmploymentStatusDuration))
-with(subset(data_o,!is.na(ProsperRating..numeric.)&!is.na(EmploymentStatusDuration)),aggregate(list(avg_employment_dur=EmploymentStatusDuration),list(rating=ProsperRating..numeric.),mean))
+with(subset(data_o,!is.na(ProsperRating..numeric.)&
+              !is.na(EmploymentStatusDuration)),
+     cor.test(ProsperRating..numeric.,EmploymentStatusDuration))
 
-wilcox.test(subset(data_o,!is.na(ProsperRating..numeric.)&IsBorrowerHomeowner=='True')$ProsperRating..numeric.,subset(data_o,!is.na(ProsperRating..numeric.)&IsBorrowerHomeowner=='False')$ProsperRating..numeric.,alternative='greater')
+with(subset(data_o,!is.na(ProsperRating..numeric.)&
+              !is.na(EmploymentStatusDuration)),
+     aggregate(list(avg_employment_dur=EmploymentStatusDuration),
+               list(rating=ProsperRating..numeric.),
+               mean))
+
+wilcox.test(subset(data_o,!is.na(ProsperRating..numeric.)&
+                     IsBorrowerHomeowner=='True')$ProsperRating..numeric.,
+            subset(data_o,!is.na(ProsperRating..numeric.)&
+                     IsBorrowerHomeowner=='False')$ProsperRating..numeric.,
+            alternative='greater')
 
 subset(data_o,!is.na(ProsperRating..numeric.)&GroupKey!='') %>%
   group_by(GroupKey) %>%
@@ -335,20 +437,47 @@ subset(data_o,!is.na(ProsperRating..numeric.)&GroupKey!='') %>%
   filter(n>=10) %>%
   summary()
 
-ggplot(aes(x=factor(ProsperRating..numeric.),y=DelinquenciesLast7Years),data=subset(data_o,!is.na(ProsperRating..numeric.)))+geom_boxplot()+scale_y_log10()
-with(subset(data_o,!is.na(ProsperRating..numeric.)),cor.test(ProsperRating..numeric.,DelinquenciesLast7Years))
+ggplot(aes(x=factor(ProsperRating..numeric.),y=DelinquenciesLast7Years),
+       data=subset(data_o,!is.na(ProsperRating..numeric.)))+
+  geom_boxplot()+
+  scale_y_log10()
 
-wilcox.test(subset(data_o,!is.na(ProsperRating..numeric.)&PublicRecordsLast12Months==0)$ProsperRating..numeric.,subset(data_o,!is.na(ProsperRating..numeric.)&PublicRecordsLast12Months!=0)$ProsperRating..numeric.,alternative = 'greater')
+with(subset(data_o,!is.na(ProsperRating..numeric.)),
+     cor.test(ProsperRating..numeric.,DelinquenciesLast7Years))
 
-wilcox.test(subset(data_o,!is.na(ProsperRating..numeric.)&IncomeVerifiable=='True')$ProsperRating..numeric. ,subset(data_o,!is.na(ProsperRating..numeric.)&IncomeVerifiable=='False')$ProsperRating..numeric. ,alternative = 'greater')
+wilcox.test(subset(data_o,!is.na(ProsperRating..numeric.)&
+                     PublicRecordsLast12Months==0)$ProsperRating..numeric.,
+            subset(data_o,!is.na(ProsperRating..numeric.)&
+                     PublicRecordsLast12Months!=0)$ProsperRating..numeric.,
+            alternative = 'greater')
 
-ggplot(aes(x=factor(ProsperRating..numeric.),y=OnTimeProsperPayments),data=subset(data_o,!is.na(ProsperRating..numeric.)))+geom_boxplot()+scale_y_log10()
-with(subset(data_o,!is.na(ProsperRating..numeric.)),cor.test(ProsperRating..numeric.,OnTimeProsperPayments))
+wilcox.test(subset(data_o,!is.na(ProsperRating..numeric.)&
+                     IncomeVerifiable=='True')$ProsperRating..numeric. ,
+            subset(data_o,!is.na(ProsperRating..numeric.)&
+                     IncomeVerifiable=='False')$ProsperRating..numeric. ,
+            alternative = 'greater')
 
-ggplot(aes(x=factor(ProsperRating..numeric.),y=ProsperPaymentsOneMonthPlusLate),data=subset(data_o,!is.na(ProsperRating..numeric.)))+geom_boxplot()+scale_y_log10()
-with(subset(data_o,!is.na(ProsperRating..numeric.)),cor.test(ProsperRating..numeric.,ProsperPaymentsOneMonthPlusLate))
+ggplot(aes(x=factor(ProsperRating..numeric.),y=OnTimeProsperPayments),
+       data=subset(data_o,!is.na(ProsperRating..numeric.)))+
+  geom_boxplot()+
+  scale_y_log10()
 
-wilcox.test(subset(data_o,!is.na(ProsperRating..numeric.)&Recommendations!=0)$ProsperRating..numeric.,subset(data_o,!is.na(ProsperRating..numeric.)&Recommendations==0)$ProsperRating..numeric.,alternative = 'greater')
+with(subset(data_o,!is.na(ProsperRating..numeric.)),
+     cor.test(ProsperRating..numeric.,OnTimeProsperPayments))
+
+ggplot(aes(x=factor(ProsperRating..numeric.),y=ProsperPaymentsOneMonthPlusLate),
+       data=subset(data_o,!is.na(ProsperRating..numeric.)))+
+  geom_boxplot()+
+  scale_y_log10()
+
+with(subset(data_o,!is.na(ProsperRating..numeric.)),
+     cor.test(ProsperRating..numeric.,ProsperPaymentsOneMonthPlusLate))
+
+wilcox.test(subset(data_o,!is.na(ProsperRating..numeric.)&
+                     Recommendations!=0)$ProsperRating..numeric.,
+            subset(data_o,!is.na(ProsperRating..numeric.)&
+                     Recommendations==0)$ProsperRating..numeric.,
+            alternative = 'greater')
 ```
 
 EstimatedReturn, IncomeVerifiable and IsBorrowerHomeowner are directly related to the rating;
@@ -369,13 +498,21 @@ ProsperPaymentsOneMonthPlusLate of those who are rated 5, 6, and 7 have decreasi
 ##Final Plots
 ```{r echo=FALSE, Final_Plot_1}
 #Final Plot 1
-ggplot(data=subset(data_o,InvestmentFromFriendsAmount!=0),aes(x=DebtToIncomeRatio ,y=InvestmentFromFriendsAmount/LoanOriginalAmount))+
+ggplot(data=subset(data_o,InvestmentFromFriendsAmount!=0),
+       aes(x=DebtToIncomeRatio ,
+           y=InvestmentFromFriendsAmount/LoanOriginalAmount))+
   geom_point()+
-  stat_sum(aes(color=factor(ListingCategory..numeric.),size=StatedMonthlyIncome))+
+  stat_sum(aes(color=factor(ListingCategory..numeric.),
+               size=StatedMonthlyIncome))+
   xlim(0,quantile(data_o$DebtToIncomeRatio,0.99,na.rm = TRUE))+
   ggtitle('Debt-to-Income Ratio against Investment from Friend to Total Original Loan Ratio (colored by listing category)')
 
-ggplot(data=subset(data_o,(InvestmentFromFriendsAmount!=0 & !(ListingCategory..numeric. %in% c(0,1,4,6,7))) & IncomeVerifiable=='True'),aes(x=DebtToIncomeRatio ,y=InvestmentFromFriendsAmount/LoanOriginalAmount))+
+ggplot(data=subset(data_o,
+                   (InvestmentFromFriendsAmount!=0 &
+                      !(ListingCategory..numeric. %in% c(0,1,4,6,7))) &
+                     IncomeVerifiable=='True'),
+       aes(x=DebtToIncomeRatio,
+           y=InvestmentFromFriendsAmount/LoanOriginalAmount))+
   geom_point(alpha=0)+
   stat_sum(aes(color=factor(ListingCategory..numeric.),size=StatedMonthlyIncome))+
   scale_x_continuous(breaks=pretty_breaks(n=100))+
@@ -393,7 +530,14 @@ Those who applied for a loan while having a large income are very likely to be i
 
 ```{r echo=FALSE, Final_Plot_2}
 #Final Plot 2
-ggplot(subset(data_o,!is.na(ProsperRating..numeric.)&IncomeVerifiable=='True'),aes(StatedMonthlyIncome,TradesNeverDelinquent..percentage.,color=factor(ProsperRating..numeric.)))+geom_point(alpha=0.8)+xlim(0,quantile(data_o$StatedMonthlyIncome,0.99))+scale_color_manual(values=c('1'='green','2'='green','3'='grey','4'='grey','5'='grey','6'='orange','7'='orange'))+ggtitle('Proportion of Non-Delinquent Trades Against Monthly Income (colored by prosper rating)')
+ggplot(subset(data_o,!is.na(ProsperRating..numeric.)&
+                IncomeVerifiable=='True'),
+       aes(StatedMonthlyIncome,TradesNeverDelinquent..percentage.,
+           color=factor(ProsperRating..numeric.)))+
+  geom_point(alpha=0.8)+
+  xlim(0,quantile(data_o$StatedMonthlyIncome,0.99))+
+  scale_color_manual(values=c('1'='green','2'='green','3'='grey','4'='grey','5'='grey','6'='orange','7'='orange'))+
+  ggtitle('Proportion of Non-Delinquent Trades Against Monthly Income (colored by prosper rating)')
 ```
 
 Generally, the lower bound of percentage of trades that never delinquent increases as stated monthly income increases, and profiles with higher prosper ratings tend to have higher income (no causation implied). There are still some green points lying on the top right corner of the graph, which is an unexplainable phenomenon by the graph.
@@ -401,18 +545,31 @@ Generally, the lower bound of percentage of trades that never delinquent increas
 
 ```{r echo=F, Final_Plot_3}
 #Final Plot 3
-data_o$LoanOriginationDate<-as.POSIXct(strptime(data_o$LoanOriginationDate, "%Y-%m-%d %H:%M:%S"))
+data_o$LoanOriginationDate<-
+  as.POSIXct(strptime(data_o$LoanOriginationDate, "%Y-%m-%d %H:%M:%S"))
 
-ggplot(data_o,aes(LoanOriginationDate,LoanOriginalAmount))+geom_point(alpha=0.1,color='purple')+ggtitle('Loan Amount Against Loan Origination Date')+scale_x_datetime(breaks=date_breaks('3 months'))+theme(axis.text.x=element_text(angle=75,hjust=1,vjust=0.5))
+ggplot(data_o,aes(LoanOriginationDate,LoanOriginalAmount))+
+  geom_point(alpha=0.1,color='purple')+
+  ggtitle('Loan Amount Against Loan Origination Date')+
+  scale_x_datetime(breaks=date_breaks('3 months'))+
+  theme(axis.text.x=element_text(angle=75,hjust=1,vjust=0.5))
 
 data_o$LoanOriginationDate_m<-floor_date(data_o$LoanOriginationDate,'month')
+
 data_o.sum_by_LoanOrigDate<-subset(data_o,!is.na(LoanOriginationDate)) %>%
   group_by(LoanOriginationDate_m) %>%
   summarise(LoanOriginalAmount=sum(LoanOriginalAmount)) %>%
   arrange(desc(LoanOriginalAmount))
+
 names(data_o.sum_by_LoanOrigDate)<-c('LoanOriginationDate','LoanOriginalAmount')
 head(data_o.sum_by_LoanOrigDate)
-ggplot(data_o.sum_by_LoanOrigDate,aes(LoanOriginationDate,LoanOriginalAmount))+geom_line()+scale_x_datetime(breaks=date_breaks('3 months'))+theme(axis.text.x=element_text(angle=75,hjust=1,vjust=0.5))+ggtitle('Totoal Loan per Month Against Loan Origination Month')
+
+ggplot(data_o.sum_by_LoanOrigDate,
+       aes(LoanOriginationDate,LoanOriginalAmount))+
+  geom_line()+
+  scale_x_datetime(breaks=date_breaks('3 months'))+
+  theme(axis.text.x=element_text(angle=75,hjust=1,vjust=0.5))+
+  ggtitle('Totoal Loan per Month Against Loan Origination Month')
 ```
 
 from 2006 to 2009, the loan amounts each period were quite consistent. 
