@@ -26,14 +26,16 @@ data_o <- read.csv('prosperLoanData.csv', sep = ',')
 ```{r echo=FALSE}
 str(data_o)
 ```
+
 ##Some Basic Overviews on The Dateset
+
+I will firstly do some general summary to obtain some basic information about variables:
+
 ```{r echo=FALSE}
 #find all categorical variables
 data_sub_cat <- data_o[sapply(data_o,is.factor)]
 names(data_sub_cat)
 ```
- 
-
 
 ```{r}
 #identify levels of factors
@@ -60,6 +62,9 @@ Over 2/3 of the total observations do not have CreditGrade
 Some variables related to delinquencies have skewed obervations.
 
 ##Univariante Graphs and Basic Analysis
+
+Graph of each variable will be drawn, except those which do not provide any information (they will be commented out in the code).
+
 ```{r}
 #Univariate Graphs
 
@@ -102,7 +107,7 @@ qqnorm(with(subset(data_o,!is.na(EstimatedReturn)),
             EstimatedReturn-mean(EstimatedReturn)))
 ```
 
-EstimatedReturn is not symmetrically distributed around mean.
+EstimatedReturn is not symmetrically distributed around mean (positive skewed), and there are some negative estimated return.
  
 ```{r}
 qplot(data=data_o,x=EstimatedReturn,bins=500)
@@ -124,6 +129,14 @@ head(data_o.sum_by_BorRat)
 ```
 
 Counting the frequency of each value of BorrowerRate. One possibile cause of high-count EstimateReturn may be a high count of BorrowerRate at 0.3177.
+
+```{r}
+tmp_d<-subset(data_o,BorrowerRate==0.3177)$LoanOriginationQuarter
+tmp_d<-factor(tmp_d)
+summary(tmp_d)
+```
+
+The BorrowerrRate at 0.3177 may relate to some events from Q4 2011 to Q1 2013. 
  
 ```{r}
 # qplot(data=data_o,x=ProsperRating..numeric.)
@@ -273,6 +286,8 @@ with(data_o,cor.test(ProsperScore,Recommendations))
 
 Some loans have comparatively high recommendations while most loans have no recommendation. Although by summarising, loans with more recommendations tend to have higher Prosper Scores, but corelation test tells us nothing. This may due to dominantly high count of zero recommendations. 
 
+Single varibale graphs may contain too less information, and cannot explain why some graphs have similarity. Therefore I will draw some multivariate graphs, and try to find out some relationships between variables.
+
 ##Bi- and Multi-variate Graph and More Analysis
 
 Firstly I will investigate the relationship between the nine similar distributed variables.
@@ -297,9 +312,11 @@ It is also not suprising that public records over last 12 months and over last 1
 
 It is suprising that correlation between CurrenctDelinquencies and DelinquenciesLast7Years is relatively higher than that between AmountDelinquent and DelinquenciesLast7Years, but since both of them are very small (<0.5, and thus useless), the difference can be ignored.
 
-Also, notice that there are several different scores in the dataset: CreditGrade, ProsperRating, ProsperScore, ScorexChangeAtTimeOfListing.The four scores should agree with each other.
+
+
+It is also vary interesting that there are several different scores in the dataset: CreditGrade, ProsperRating, ProsperScore, ScorexChangeAtTimeOfListing.The four scores should agree with each other.
  
-```{r}
+```{r Graph_Of_Four_Scores}
 plot1<-ggplot(data=subset(data_o,data_o$CreditGrade!=''),
               aes(x=CreditGrade))+
   geom_bar()
@@ -325,7 +342,7 @@ A question then arises: What are these four scores?
 
 According to [the discription document](https://docs.google.com/spreadsheets/d/1gDyi_L4UvIrLTEC6Wri5nbaMmkGmLQBk-Yx3z0XDEtI/edit#gid=0), CreditGrade was the credit rating before 2009, and ProsperScore/ProsperRating was the credit rating after July 2009. The ScorexChangeAtTimeOfListing is the change in score between each loan of a specific borrower. 
 
-```{r warning=FALSE, echo=FALSE, message=FALSE}
+```{r Bivariate_Graph_of_Two_Scores}
 ggplot(aes(x=ProsperScore,y=ProsperRating..numeric.),
        data=data_o)+
   geom_point(position = 'jitter',alpha=1/50)
@@ -333,13 +350,11 @@ ggplot(aes(x=ProsperScore,y=ProsperRating..numeric.),
 
 According to the graph, ProsperScore and ProsperRating agree with each other in trend, but disagree with each other in many profiles. Therefore a question arises: which score is more reliable?
 
-```{r warning=FALSE, echo=FALSE, message=FALSE}
+```{r Arrange_Data}
 #create new a variable to classify profiles by year
 data_o$YearCreditPulled<-
   as.numeric(format(as.POSIXct(data_o$DateCreditPulled),'%Y'))
-```
 
-```{r warning=FALSE, echo=FALSE, message=FALSE}
 #create a subset that only contains information about members that appear twice or more.
 data_o_after2009<-subset(data_o,YearCreditPulled >= 2009)
 
@@ -376,9 +391,7 @@ Dup_Member_data<-
 
 Dup_Member_data$score<-factor(Dup_Member_data$score)
 Dup_Member_data$rating<-factor(Dup_Member_data$rating)
-```
 
-```{r warning=FALSE, echo=FALSE, message=FALSE}
 with(subset(Dup_Member_data,year!=0),
      aggregate(list(avg_delinq=delinq),list(score=score),mean))
 
@@ -392,7 +405,8 @@ However, average delinquency of people with higher ratings is lower than that of
 
 Therefore, the rating might be a more appropriate measure of people's credit.
 
-The next question is: what kinds of profiles tend to have a higher rating?
+
+A natural next question is: what kinds of profiles tend to have a higher rating?
 
 The following variables may relate to the ProsperRating:
 
@@ -404,6 +418,8 @@ Effect of them will be investigated separately.
 ggplot(data=data_o,
        aes(y=EstimatedReturn,x=factor(ProsperRating..numeric.)))+
   geom_boxplot()
+
+cor.test(data_o$ProsperRating..numeric.,data_o$EstimatedReturn)
 
 with(subset(data_o,!is.na(ProsperRating..numeric.)),
      cor.test(ProsperRating..numeric.,ListingCategory..numeric.))
@@ -480,9 +496,9 @@ wilcox.test(subset(data_o,!is.na(ProsperRating..numeric.)&
             alternative = 'greater')
 ```
 
-EstimatedReturn, IncomeVerifiable and IsBorrowerHomeowner are directly related to the rating;
+EstimatedReturn, IncomeVerifiable and IsBorrowerHomeowner are directly related to the rating, though suprisingly, Rating and EstimatedReturn are negatively correlated;
 
-Some Occupations have different mean and variance than others, but may due to the small sample size;
+Some Occupations have different mean and variance than others, but may result from the small sample size;
 
 Mean Employement Duration of all users are approximately the same. although those who are rated 1, 2, and 3 have approximately 10% lower values than those who are rated 4, 5, and 6, those who are rated 7 have average employment duartion between the two groups;
 
@@ -495,9 +511,11 @@ Those who have PublicRecordsLast12Months equal to zero have higher average ratin
 
 ProsperPaymentsOneMonthPlusLate of those who are rated 5, 6, and 7 have decreasing means on payments that are paid more than one month late.
 
-##Final Plots
-```{r echo=FALSE, Final_Plot_1}
-#Final Plot 1
+The following are some other interesting plots:
+
+What kinds of people have higher investment from friend?
+
+```{r}
 ggplot(data=subset(data_o,InvestmentFromFriendsAmount!=0),
        aes(x=DebtToIncomeRatio ,
            y=InvestmentFromFriendsAmount/LoanOriginalAmount))+
@@ -524,27 +542,13 @@ ggplot(data=subset(data_o,
 
 Obviously, people with heigher debt-to-income ratio have lower percentage of friend investment. Most of those who have 100% friend investment belong to category- 0 (Not Available), 1 (Debt Consolidation), 4 (Personal Loan), and 6 (Auto), which are all non-informative. By filtering out those obscure categories, I got the second graph.
 
-Only those who are in the categories: 2 (Home Improvement), 3 (Business), 5 (Student Use),and 13 (Household expenses). Actually most loans with non-zero friend investment are for home improvement and business.
+Only those who are in the categories: 2 (Home Improvement), 3 (Business), 5 (Student Use),and 13 (Household expenses) have friend investments above 50%. Actually most loans with non-zero friend investment are for home improvement and business.
 
 Those who applied for a loan while having a large income are very likely to be in category 2 (Home Improvement)
 
-```{r echo=FALSE, Final_Plot_2}
-#Final Plot 2
-ggplot(subset(data_o,!is.na(ProsperRating..numeric.)&
-                IncomeVerifiable=='True'),
-       aes(StatedMonthlyIncome,TradesNeverDelinquent..percentage.,
-           color=factor(ProsperRating..numeric.)))+
-  geom_point(alpha=0.8)+
-  xlim(0,quantile(data_o$StatedMonthlyIncome,0.99))+
-  scale_color_manual(values=c('1'='green','2'='green','3'='grey','4'='grey','5'='grey','6'='orange','7'='orange'))+
-  ggtitle('Proportion of Non-Delinquent Trades Against Monthly Income (colored by prosper rating)')
-```
+When do people lend more?
 
-Generally, the lower bound of percentage of trades that never delinquent increases as stated monthly income increases, and profiles with higher prosper ratings tend to have higher income (no causation implied). There are still some green points lying on the top right corner of the graph, which is an unexplainable phenomenon by the graph.
-
-
-```{r echo=F, Final_Plot_3}
-#Final Plot 3
+```{r}
 data_o$LoanOriginationDate<-
   as.POSIXct(strptime(data_o$LoanOriginationDate, "%Y-%m-%d %H:%M:%S"))
 
@@ -558,8 +562,8 @@ data_o$LoanOriginationDate_m<-floor_date(data_o$LoanOriginationDate,'month')
 
 data_o.sum_by_LoanOrigDate<-subset(data_o,!is.na(LoanOriginationDate)) %>%
   group_by(LoanOriginationDate_m) %>%
-  summarise(LoanOriginalAmount=sum(LoanOriginalAmount)) %>%
-  arrange(desc(LoanOriginalAmount))
+  summarise(TotalLoanAmount=sum(LoanOriginalAmount)) %>%
+  arrange(desc(TotalLoanAmount))
 
 names(data_o.sum_by_LoanOrigDate)<-c('LoanOriginationDate','LoanOriginalAmount')
 head(data_o.sum_by_LoanOrigDate)
@@ -582,6 +586,97 @@ The total amount of loan processed at the end of 2012 dropped dramatically until
 
 The final big change is at the end of the first quarter 2013. The maximum amount of loan allowed seemed to be increased to 35,000 from 25,000. The total loan amount increased almost every month since then.
 
+The above are all interesting questions that I can think of by now, and it's now time for some final works.
+
+##Final Plots
+
+####Final Plot 1
+
+In the multivariate (including bivariate) graph section, I said there may be relationship between delinquceies and the Prosper Rating, and also between income with prosper rating. It is reasonable to guess that delinquencies also have strong relationsip with income. So my first final graph will be as below.
+
+```{r echo=FALSE, Final_Plot_1}
+#Final Plot 1
+data_final_1<-subset(data_o,!is.na(ProsperRating..numeric.)&IncomeVerifiable=='True')
+data_final_1$StatedMonthlyIncome<-
+  ifelse(data_final_1$StatedMonthlyIncome<=quantile(data_o$StatedMonthlyIncome,0.5),
+         'below average','above average')
+data_final_1$StatedMonthlyIncome<-factor(data_final_1$StatedMonthlyIncome)
+
+ggplot(data_final_1,
+       aes(color=StatedMonthlyIncome,
+           y=TradesNeverDelinquent..percentage.,
+           x=ProsperRating..numeric.))+
+  geom_point(alpha=0.5)+
+  geom_jitter(width=0.5,alpha=0.5)+
+  scale_x_discrete(limits=seq(1,7))+
+  xlab('ProsperRating')+
+  ggtitle("Percentages of Trades That never Delinquent Against Prosper Ratings (Colored by Monthly Income)")
+```
+
+As predicted, people with higher ratings generally have lower delinquent percentages and higher income. (However, suprisingly, few people who rated 1 and 2 have pretty low y-value)
+
+####Final Plot 2
+
+```{r echo=FALSE, Final_Plot_2}
+#Final Plot 2
+data_final_2<-data_o
+
+data_final_2$IncomeVerifiable<-
+  ifelse(data_final_2$IncomeVerifiable=="True",1,0)
+
+data_final_2$IsBorrowerHomeowner<-
+  ifelse(data_final_2$IsBorrowerHomeowner=="True",1,0)
+
+data_final_2$simple_rating_model<-
+  -((data_final_2$EstimatedReturn-
+     min(data_final_2$EstimatedReturn,na.rm=T))/
+  (max(data_final_2$EstimatedReturn,na.rm=T)-
+     min(data_final_2$EstimatedReturn,na.rm=T)))+
+  (data_final_2$IsBorrowerHomeowner)
+
+data_final_2<-
+  subset(data_final_2,
+         !is.na(data_final_2$simple_rating_model&
+                  data_final_2$ProsperRating..numeric.))
+
+ggplot(data_final_2,
+       aes(factor(ProsperRating..numeric.),simple_rating_model))+
+  geom_boxplot()+
+  xlab("Prosper Rating")+
+  ylab("Simple Rating Model")+
+  ggtitle("Boxplot of A Simple Rating Model Grouped by Ratings")
+```
+
+The simple rating model is -((EstimatedReturn-min(EstimatedReturn))/(max(EstimatedReturn)-min(EstimatedReturn)))[between -1 and 0]+IsBorrowerHomeowner[0 or 1].
+
+The two variables (in addition to income) were claimed to be related to ProsperRating, and the graph agrees with the claim except that mean model score of those rated 1 is higher than that of those rated 2 and 3. However, because people with the lowest ratings often disagree with trends in many analysis above, I would treat them as special cases (which thus do not matter) for now.
+
+Average model scores of those rated higher than 3 are above 0, so on average, they do have house.
+
+####Final Plot 3
+
+```{r echo=F, Final_Plot_3}
+#Final Plot 3
+ggplot(data=subset(data_o,
+                   InvestmentFromFriendsAmount!=0 &
+                      !(ListingCategory..numeric. %in% c(0,1,4,6,7))),
+       aes(InvestmentFromFriendsAmount/LoanOriginalAmount,
+           color=factor(ListingCategory..numeric.)))+
+  geom_freqpoly(binwidth=0.05,size=1)+
+  ggtitle("Frequency Graph of Investment From Friends grouped by Listing Category")+
+  guides(color=guide_legend(title="Listing Category"))
+```
+
+As previously discovered, only those who are in the categories: 2 (Home Improvement), 3 (Business), 5 (Student Use),and 13 (Household expenses) have friend investments above 50%, and most loans with non-zero friend investment are for home improvement and business (and also many for student use). 
+
+However, from the graph, we can also see that:
+
+1. among those categories, actually most loans are for business, home improvement and student uses.
+
+2. among all categories, only very small percentage of loans are in these categories. Others are in general categories:  0 - Not Available, 1 - Debt Consolidation,  4 - Personal Loan, 6 - Auto, and 7- Other.
+
+3. Except the three categories mentioned above, all categories in the graph have very low count.
+
 ##Reflection
 
 There are too many variables, and most of them are new to me. I spent a lot of time investigating into them and although at last I still don't know what some of them mean, but at least I can start some analysis on the ones I figured out.
@@ -591,3 +686,5 @@ Another similar problem is that although I know what some variables mean, but I 
 Relations between many of the variables are also very week. For example, looking at the second final graph, if I make orange points yellow, and green points red, then the graph will show dominantly large amount of red points on the top-right corner of the graph. Similarly, there are many highly rated people on the very left of the graph. Although by grouping I can easily conclude that in general people with higher ratings have higher average income, but there are too many unexplainable exceptions. Similar problems apply to many other pairs of variables.
 
 Despite all the problems described above, I still tried to make some graph that may convey some (though very limited) interest information. Hope whoever read the report would like it.
+
+One of the interest findings in many analysis is that some potential factors of ratings 1, and 2 (and maybe 3) often do not follow the trend which factors of higher ratings do. Therefore there may be some dominating factor which decide whether a person should be rated above or below 2 or 3, and the factor does not affect the exact rating the person will get if he/she has higher rating. Maybe a future work can focus on finding out this variable.
